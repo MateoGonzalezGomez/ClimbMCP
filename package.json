@@ -1,0 +1,15 @@
+{
+  "name": "climbing-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for serving climbing book PDF chapters",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.1",
+    "pdf2json": "^3.2.0",
+    "pdfreader": "^3.0.7"
+  }
+}
