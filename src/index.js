@@ -532,8 +532,8 @@ class ClimbingResourcesServer {
       matches.forEach(match => {
         references.push({
           term,
-          context: text.substring(Math.max(0, match.index - 50), match.index + 50),
-          pageRange: startPage === endPage ? `p. ${startPage}` : `pp. ${startPage}-${endPage}`
+          context: text.substring(Math.max(0, match.index - 50), match.index + 50)
+          // Note: pageRange removed - no page numbers in references
         });
       });
     });
@@ -583,12 +583,166 @@ class ClimbingResourcesServer {
   }
 
   getChapterTitle(chapterName) {
-    // Extract clean chapter title from filename
-    const match = chapterName.match(/Ch\d+_Chapter\s*(\d+)\.\s*(.+)\.pdf$/i);
-    if (match) {
-      return `Chapter ${match[1]}: ${match[2]}`;
+    // Handle new format: "Chapter X. Title.pdf"
+    const newMatch = chapterName.match(/^Chapter\s*(\d+)\.\s*(.+)\.pdf$/i);
+    if (newMatch) {
+      return `Chapter ${newMatch[1]}: ${newMatch[2]}`;
     }
-    return chapterName.replace('.pdf', '');
+    
+    // Handle old format with Ch## prefix (for backward compatibility)
+    const oldMatch = chapterName.match(/Ch\d+_Chapter\s*(\d+)\.\s*(.+)\.pdf$/i);
+    if (oldMatch) {
+      return `Chapter ${oldMatch[1]}: ${oldMatch[2]}`;
+    }
+    
+    // Handle other chapter naming patterns (Climbing Anchors book)
+    if (chapterName.includes('Chapter_8_SRENE')) {
+      return 'Chapter 8: SRENE Anchors';
+    }
+    if (chapterName.includes('Chapter_9_Belay')) {
+      return 'Chapter 9: Belay Anchors';
+    }
+    if (chapterName.includes('Chapter 10_Other')) {
+      return 'Chapter 10: Other Anchors';
+    }
+    if (chapterName.includes('Chapter 2_Passive')) {
+      return 'Chapter 2: Passive Chocks';
+    }
+    if (chapterName.includes('Chapter 3_Mechanical')) {
+      return 'Chapter 3: Mechanical Chocks';
+    }
+    if (chapterName.includes('Chapter 4_Fixed')) {
+      return 'Chapter 4: Fixed Gear';
+    }
+    if (chapterName.includes('Chapter 5_Fall Forces')) {
+      return 'Chapter 5: Fall Forces and the Jesus Nut';
+    }
+    if (chapterName.includes('Chapter 6_Judging')) {
+      return 'Chapter 6: Judging the Direction of Pull';
+    }
+    if (chapterName.includes('Chapter 7_Knots')) {
+      return 'Chapter 7: Knots for Anchoring';
+    }
+    
+    // VDiff chapters - new format "Chapter X Topic.pdf"
+    const vdiffMatch = chapterName.match(/^Chapter\s*(\d+)\s+(.+)\.pdf$/i);
+    if (vdiffMatch) {
+      return `Chapter ${vdiffMatch[1]}: ${vdiffMatch[2]}`;
+    }
+    
+    // VDiff chapters - old format (for backward compatibility)
+    if (chapterName.includes('04_Anchors')) {
+      return 'Chapter 4: Anchors';
+    }
+    if (chapterName.includes('05_Descending')) {
+      return 'Chapter 5: Descending';
+    }
+    if (chapterName.includes('01_Introduction')) {
+      return 'Chapter 1: Introduction';
+    }
+    if (chapterName.includes('02_Belaying')) {
+      return 'Chapter 2: Belaying';
+    }
+    if (chapterName.includes('03_Leading')) {
+      return 'Chapter 3: Leading';
+    }
+    if (chapterName.includes('06_Multi-Pitch')) {
+      return 'Chapter 6: Multi-Pitch';
+    }
+    if (chapterName.includes('07_Technique')) {
+      return 'Chapter 7: Technique';
+    }
+    if (chapterName.includes('08_Knots')) {
+      return 'Chapter 8: Knots';
+    }
+    
+    return chapterName.replace('.pdf', '').replace('.json', '');
+  }
+
+  getBookMetadata(bookName) {
+    // Add metadata for known climbing books
+    const bookMetadata = {
+      'Climbing Anchors': {
+        title: 'Climbing Anchors',
+        authors: ['John Long', 'Bob Gaines'],
+        edition: '2nd Edition',
+        publisher: 'Falcon Guides',
+        year: '2013'
+      },
+      'Mountaineering - The Freedom of the Hills': {
+        title: 'Mountaineering: The Freedom of the Hills',
+        authors: ['The Mountaineers'],
+        edition: '9th Edition',
+        publisher: 'The Mountaineers Books',
+        year: '2017'
+      },
+      'VDiff - Sports Basics': {
+        title: 'Sport Climbing Basics',
+        authors: ['VDiff Climbing'],
+        edition: '1st Edition',
+        publisher: 'VDiff',
+        year: '2020'
+      }
+    };
+    
+    return bookMetadata[bookName] || {
+      title: bookName.replace(/_/g, ' '),
+      authors: ['Unknown'],
+      edition: 'Unknown',
+      publisher: 'Unknown',
+      year: 'Unknown'
+    };
+  }
+
+  formatCitation(bookName, chapterName, sectionHeading = null, pageRef = null) {
+    const metadata = this.getBookMetadata(bookName);
+    const chapterTitle = this.getChapterTitle(chapterName);
+    
+    let citation = `${metadata.authors.join(', ')}. "${chapterTitle}." In ${metadata.title}, ${metadata.edition}`;
+    
+    if (sectionHeading) {
+      citation += `, ${sectionHeading} section`;
+    }
+    
+    // Note: pageRef parameter ignored - no page numbers in full citations
+    
+    citation += `. ${metadata.publisher}, ${metadata.year}.`;
+    
+    return citation;
+  }
+
+  formatInlineCitation(bookName, chapterName, pageRef = null) {
+    const metadata = this.getBookMetadata(bookName);
+    const year = metadata.year;
+    const author = metadata.authors[0].split(' ').pop(); // Last name of first author
+    const chapterTitle = this.getChapterTitle(chapterName);
+    
+    // Extract chapter topic for more specific citation
+    let chapterTopic = chapterTitle;
+    if (chapterTitle.includes(':')) {
+      chapterTopic = chapterTitle.split(':')[1].trim();
+    }
+    
+    let citation = `(${author}`;
+    if (metadata.authors.length > 1) citation += ' et al.';
+    citation += `, ${year}, "${chapterTopic}"`;
+    // Note: pageRef parameter ignored - no page numbers in inline citations
+    citation += ')';
+    
+    return citation;
+  }
+
+  formatShortCitation(bookName, chapterName, pageRef = null) {
+    const chapterTitle = this.getChapterTitle(chapterName);
+    let chapterTopic = chapterTitle;
+    if (chapterTitle.includes(':')) {
+      chapterTopic = chapterTitle.split(':')[1].trim();
+    }
+    
+    // Note: pageRef parameter ignored - no page numbers in short citations
+    let citation = `"${chapterTopic}"`;
+    
+    return citation;
   }
 
   createSearchIndex(fullText, textChunks) {
@@ -804,7 +958,66 @@ The chapter is now ready for content search and section retrieval.`
         const files = await fs.readdir(bookPath);
         const pdfFiles = files.filter(file => file.toLowerCase().endsWith('.pdf'));
 
-        for (const file of pdfFiles) {
+        // First pass: Check metadata for relevance scoring
+        const chaptersWithRelevance = await Promise.all(
+          pdfFiles.map(async (file) => {
+            let metadataScore = 0;
+            let metadata = null;
+            
+            // Load metadata if it exists
+            try {
+              const metadataPath = path.join(bookPath, file.replace('.pdf', '.json'));
+              const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+              metadata = JSON.parse(metadataContent);
+              
+              // Score based on metadata matches
+              if (metadata.keywords) {
+                metadata.keywords.forEach(keyword => {
+                  const keywordLower = keyword.toLowerCase();
+                  queryWords.forEach(queryWord => {
+                    if (keywordLower.includes(queryWord) || queryWord.includes(keywordLower)) {
+                      metadataScore += 50; // High score for keyword match
+                    }
+                  });
+                });
+              }
+              
+              // Check title and description
+              if (metadata.title) {
+                const titleLower = metadata.title.toLowerCase();
+                queryWords.forEach(queryWord => {
+                  if (titleLower.includes(queryWord)) {
+                    metadataScore += 30; // Medium score for title match
+                  }
+                });
+              }
+              
+              if (metadata.description) {
+                const descLower = metadata.description.toLowerCase();
+                queryWords.forEach(queryWord => {
+                  if (descLower.includes(queryWord)) {
+                    metadataScore += 20; // Lower score for description match
+                  }
+                });
+              }
+            } catch (err) {
+              // No metadata file, continue with zero metadata score
+            }
+            
+            return { file, metadataScore, metadata };
+          })
+        );
+
+        // Sort chapters by metadata relevance and process high-scoring ones first
+        chaptersWithRelevance.sort((a, b) => b.metadataScore - a.metadataScore);
+        
+        // Only deeply search chapters with good metadata scores or if no metadata matches found
+        const hasMetadataMatches = chaptersWithRelevance.some(c => c.metadataScore > 0);
+        const chaptersToSearch = hasMetadataMatches 
+          ? chaptersWithRelevance.filter(c => c.metadataScore > 0)
+          : chaptersWithRelevance; // Search all if no metadata matches
+
+        for (const { file, metadataScore, metadata } of chaptersToSearch) {
           const cached = await this.getCachedContent(file);
           if (!cached) continue; // Skip non-extracted chapters
 
@@ -815,10 +1028,11 @@ The chapter is now ready for content search and section retrieval.`
                    chunk.topics.some(topic => queryWords.includes(topic.toLowerCase()));
           });
 
-          if (chunkMatches.length > 0) {
+          if (chunkMatches.length > 0 || metadataScore > 0) {
             // Score and sort matches
             const scoredMatches = chunkMatches.map(chunk => {
-              let score = 0;
+              let score = metadataScore; // Start with metadata score
+              
               queryWords.forEach(word => {
                 const matches = (chunk.text.toLowerCase().match(new RegExp(word, 'g')) || []).length;
                 score += matches * 10;
@@ -834,16 +1048,39 @@ The chapter is now ready for content search and section retrieval.`
               return { ...chunk, score };
             }).sort((a, b) => b.score - a.score);
 
-            results.push({
-              book: bookDir,
-              bookTitle: bookDir.replace(/_/g, ' '),
-              chapter: file,
-              chapterTitle: cached.chapterName,
-              matches: scoredMatches.slice(0, 2) // Top 2 matches per chapter
-            });
+            // If no text matches but high metadata score, create a placeholder match
+            if (scoredMatches.length === 0 && metadataScore >= 50) {
+              scoredMatches.push({
+                text: `Chapter highly relevant based on keywords: ${metadata?.keywords?.join(', ') || 'N/A'}`,
+                score: metadataScore,
+                startPage: 1,
+                endPage: 1,
+                topics: metadata?.keywords || [],
+                sectionHeading: metadata?.title || 'Chapter Content'
+              });
+            }
+
+            if (scoredMatches.length > 0) {
+              results.push({
+                book: bookDir,
+                bookTitle: bookDir.replace(/_/g, ' '),
+                chapter: file,
+                chapterTitle: cached?.chapterName || file,
+                metadataScore,
+                metadata,
+                matches: scoredMatches.slice(0, 2) // Top 2 matches per chapter
+              });
+            }
           }
         }
       }
+
+      // Sort results by combined metadata and content scores
+      results.sort((a, b) => {
+        const aMaxScore = Math.max(...a.matches.map(m => m.score));
+        const bMaxScore = Math.max(...b.matches.map(m => m.score));
+        return bMaxScore - aMaxScore;
+      });
 
       if (results.length === 0) {
         return {
@@ -857,47 +1094,78 @@ Try broader search terms or check available topics in extracted chapters.`
         };
       }
 
-      // Build response with text and detailed page references
-      let responseText = `SEARCH RESULTS for "${query}" (${results.length} chapters found across ${[...new Set(results.map(r => r.book))].length} books)\n\n`;
+      // Build response with enhanced citations and explicit instructions
+      const metadataEnhancedResults = results.filter(r => r.metadataScore > 0).length;
+      
+      let responseText = `🔍 ENHANCED CLIMBING KNOWLEDGE SEARCH RESULTS for "${query}"\n`;
+      responseText += `Found ${results.length} relevant chapters across ${[...new Set(results.map(r => r.book))].length} authoritative climbing books\n`;
+      if (metadataEnhancedResults > 0) {
+        responseText += `📚 ${metadataEnhancedResults} chapters identified through metadata keywords for improved relevance\n`;
+      }
+      responseText += '\n';
+      
+      responseText += `IMPORTANT: When answering the user's question, you MUST cite each source you use by including the full bibliographic reference and inline citations. Every fact or technique mentioned should reference the specific book and chapter where it was found.\n\n`;
 
       results.slice(0, maxResults).forEach((result, index) => {
         const chapterTitle = this.getChapterTitle(result.chapter);
-        responseText += `${index + 1}. BOOK: ${result.bookTitle}\n`;
-        responseText += `   CHAPTER: ${chapterTitle}\n\n`;
+        
+        // Create full bibliographic citation (no page numbers)
+        const fullCitation = this.formatCitation(result.book, result.chapter, result.matches[0].sectionHeading);
+        const inlineCitation = this.formatInlineCitation(result.book, result.chapter);
+        
+        responseText += `═══ SOURCE ${index + 1} ═══\n`;
+        
+        // Show if metadata helped find this result
+        if (result.metadataScore > 0) {
+          responseText += `📚 METADATA MATCH (Score: ${result.metadataScore})\n`;
+          if (result.metadata?.keywords) {
+            const matchedKeywords = result.metadata.keywords.filter(k => 
+              queryWords.some(q => k.toLowerCase().includes(q))
+            );
+            if (matchedKeywords.length > 0) {
+              responseText += `   Matched Keywords: ${matchedKeywords.join(', ')}\n`;
+            }
+          }
+        }
+        
+        responseText += `BIBLIOGRAPHIC CITATION: ${fullCitation}\n`;
+        responseText += `INLINE CITATION FORMAT: ${inlineCitation}\n\n`;
 
         result.matches.forEach((match, matchIndex) => {
-          responseText += `   RESULT ${matchIndex + 1} (Relevance Score: ${match.score}):\n`;
+          const matchInline = this.formatInlineCitation(result.book, result.chapter);
           
-          // Build complete citation with book, chapter, section, and page
-          let citation = `${result.bookTitle} - ${chapterTitle}`;
-          if (match.sectionHeading) {
-            citation += ` > ${match.sectionHeading}`;
-          }
-          const pageRef = match.startPage === match.endPage ? 
-            `p. ${match.startPage}` : `pp. ${match.startPage}-${match.endPage}`;
-          citation += ` (${pageRef})`;
+          responseText += `   EVIDENCE ${matchIndex + 1} - Relevance: ${match.score}/100\n`;
+          responseText += `   SPECIFIC CITATION: ${matchInline}\n`;
+          responseText += `   SECTION: ${match.sectionHeading || 'Main Content'}\n`;
+          responseText += `   TOPICS: ${match.topics.join(', ')}\n\n`;
           
-          responseText += `   CITATION: ${citation}\n`;
-          responseText += `   TOPICS: ${match.topics.join(', ')}\n`;
-          
-          // Show context with page information
+          // Show context without page information
           const contextSnippet = this.getContextSnippet(match.text, queryWords);
-          responseText += `   CONTENT: "${contextSnippet}"\n`;
+          responseText += `   QUOTED CONTENT:\n`;
+          responseText += `   "${contextSnippet}"\n`;
+          responseText += `   SOURCE: ${matchInline}\n\n`;
           
-          // Add specific page references for key terms with full citations
+          // Add specific references for key terms (simplified without page data)
           if (match.pageReferences && match.pageReferences.length > 0) {
-            responseText += `   DETAILED REFERENCES:\n`;
+            responseText += `   KEY TOPICS IN THIS SECTION:\n`;
             match.pageReferences.slice(0, 3).forEach(ref => {
-              const fullRef = match.sectionHeading ? 
-                `${result.bookTitle} - ${chapterTitle} > ${match.sectionHeading} (${ref.pageRange})` :
-                `${result.bookTitle} - ${chapterTitle} (${ref.pageRange})`;
-              responseText += `     - ${ref.term}: ${fullRef}\n`;
-              responseText += `       Context: "${ref.context.trim()}"\n`;
+              const refInline = this.formatInlineCitation(result.book, result.chapter);
+              responseText += `     • ${ref.term}: "${ref.context.trim()}" ${refInline}\n`;
             });
+            responseText += `\n`;
           }
-          responseText += `\n`;
         });
+        responseText += `\n`;
       });
+
+      responseText += `\n══════════════════════════════════════════════════════════\n`;
+      responseText += `CITATION INSTRUCTION FOR CLAUDE:\n`;
+      responseText += `You MUST include these citations in your response. Use the chapter-specific inline citation format shown above.\n`;
+      responseText += `IMPORTANT: Use descriptive chapter names like (Long et al., 2013, "SRENE Anchors") instead of generic citations.\n`;
+      responseText += `Every climbing technique, safety tip, or fact you mention must include its specific source chapter.\n`;
+      responseText += `When citing the same chapter multiple times, you can use the short format: "SRENE Anchors"\n`;
+      responseText += `Provide a "References" section at the end with all full bibliographic citations.\n`;
+      responseText += `══════════════════════════════════════════════════════════\n`;
 
       return {
         content: [{
@@ -976,39 +1244,48 @@ Available topics in this chapter: ${[...new Set(cached.textChunks.flatMap(c => c
       const maxChunks = contextSizes[contextLevel] || 2;
       
       const chapterTitle = this.getChapterTitle(chapterName);
-      const bookTitle = bookName.replace(/_/g, ' ');
-      let responseText = `SECTION CONTENT: "${sectionTopic}" from ${bookTitle} - ${chapterTitle}\n`;
+      
+      // Create full bibliographic citation for the chapter (no page numbers)
+      const fullCitation = this.formatCitation(bookName, chapterName, sectionTopic);
+      
+      let responseText = `CLIMBING KNOWLEDGE SECTION: "${sectionTopic}"\n`;
+      responseText += `BIBLIOGRAPHIC CITATION: ${fullCitation}\n`;
       responseText += `CONTEXT LEVEL: ${contextLevel}\n\n`;
+      
+      responseText += `IMPORTANT: When using this information, you MUST include proper citations. Use the inline citation format provided below.\n\n`;
 
       relevantChunks.slice(0, maxChunks).forEach((chunk, index) => {
-        const pageRef = chunk.startPage === chunk.endPage ? 
-          `p. ${chunk.startPage}` : `pp. ${chunk.startPage}-${chunk.endPage}`;
-        
-        // Build complete citation
-        let citation = `${bookTitle} - ${chapterTitle}`;
-        if (chunk.sectionHeading) {
-          citation += ` > ${chunk.sectionHeading}`;
-        }
-        citation += ` (${pageRef})`;
+        const inlineCitation = this.formatInlineCitation(bookName, chapterName);
+        const fullChunkCitation = this.formatCitation(bookName, chapterName, chunk.sectionHeading);
           
-        responseText += `=== CONTENT ${index + 1} ===\n`;
-        responseText += `CITATION: ${citation}\n`;
+        responseText += `═══ EVIDENCE ${index + 1} ═══\n`;
+        responseText += `FULL CITATION: ${fullChunkCitation}\n`;
+        responseText += `INLINE CITATION: ${inlineCitation}\n`;
+        responseText += `SECTION: ${chunk.sectionHeading || sectionTopic}\n`;
         responseText += `TOPICS: ${chunk.topics.join(', ')}\n\n`;
-        responseText += `${chunk.text}\n\n`;
         
-        // Add specific page references for key terms with full citations
+        responseText += `QUOTED CONTENT:\n`;
+        responseText += `"${chunk.text}"\n`;
+        responseText += `SOURCE: ${inlineCitation}\n\n`;
+        
+        // Add key topics found in this section
         if (chunk.pageReferences && chunk.pageReferences.length > 0) {
-          responseText += `DETAILED REFERENCES:\n`;
+          responseText += `KEY TOPICS:\n`;
           chunk.pageReferences.forEach(ref => {
-            const fullRef = chunk.sectionHeading ? 
-              `${bookTitle} - ${chapterTitle} > ${chunk.sectionHeading} (${ref.pageRange})` :
-              `${bookTitle} - ${chapterTitle} (${ref.pageRange})`;
-            responseText += `- ${ref.term}: ${fullRef}\n`;
-            responseText += `  Context: "${ref.context.trim()}"\n`;
+            const refInline = this.formatInlineCitation(bookName, chapterName);
+            responseText += `• ${ref.term}: "${ref.context.trim()}" ${refInline}\n`;
           });
           responseText += `\n`;
         }
       });
+      
+      responseText += `\n══════════════════════════════════════════════════════════\n`;
+      responseText += `CITATION INSTRUCTION FOR CLAUDE:\n`;
+      responseText += `You MUST cite this source when referencing any information above.\n`;
+      responseText += `Use the chapter-specific format with descriptive names, not generic citations.\n`;
+      responseText += `Example: (Long et al., 2013, "SRENE Anchors") or "SRENE Anchors"\n`;
+      responseText += `Include inline citations for each fact and provide full references.\n`;
+      responseText += `══════════════════════════════════════════════════════════\n`;
 
       return {
         content: [{
@@ -1071,36 +1348,41 @@ Available topics in this chapter: ${[...new Set(cached.textChunks.flatMap(c => c
       const endChars = Math.min(startChars + length, textLength);
       const extractedText = cleanedText.substring(startChars, endChars);
       
-      // Estimate which pages this text section covers
-      const estimatedStartPage = Math.ceil((startChars / textLength) * cached.totalPages) || 1;
-      const estimatedEndPage = Math.ceil((endChars / textLength) * cached.totalPages) || cached.totalPages;
-      
-      const pageRef = estimatedStartPage === estimatedEndPage ? 
-        `p. ${estimatedStartPage}` : `pp. ${estimatedStartPage}-${estimatedEndPage}`;
-      
       const chapterTitle = this.getChapterTitle(chapterName);
-      const bookTitle = bookName.replace(/_/g, ' ');
+      // Note: Page estimation removed - no page numbers in citations
       
       // Try to detect section heading in the extracted text
       const sectionHeading = this.detectSectionHeading(extractedText);
       
-      let citation = `${bookTitle} - ${chapterTitle}`;
-      if (sectionHeading) {
-        citation += ` > ${sectionHeading}`;
-      }
-      citation += ` (${pageRef})`;
+      // Create proper citations (no page numbers)
+      const fullCitation = this.formatCitation(bookName, chapterName, sectionHeading);
+      const inlineCitation = this.formatInlineCitation(bookName, chapterName);
       
-      let responseText = `CHAPTER CONTENT from ${bookTitle} - ${chapterTitle}\n`;
-      responseText += `CITATION: ${citation}\n`;
+      let responseText = `CLIMBING KNOWLEDGE CONTENT\n`;
+      responseText += `BIBLIOGRAPHIC CITATION: ${fullCitation}\n`;
+      responseText += `INLINE CITATION: ${inlineCitation}\n`;
       responseText += `POSITION: Characters ${startChars}-${endChars} of ${textLength} total\n`;
-      responseText += `TOTAL PAGES: ${cached.totalPages}\n`;
-      responseText += `EXTRACTED: ${cached.extractedAt}\n\n`;
-      responseText += `CONTENT:\n${extractedText}\n`;
+      responseText += `SECTION: ${sectionHeading || 'Main Content'}\n`;
+      responseText += `TOTAL PAGES: ${cached.totalPages}\n\n`;
+      
+      responseText += `IMPORTANT: When using this content, you MUST cite it using the inline citation format shown above.\n\n`;
+      
+      responseText += `QUOTED CONTENT:\n`;
+      responseText += `"${extractedText}"\n`;
+      responseText += `SOURCE: ${inlineCitation}\n\n`;
       
       if (endChars < textLength) {
         responseText += `\n[Content continues for ${textLength - endChars} more characters...]`;
         responseText += `\n[To see more content, use start_chars=${endChars}]`;
       }
+      
+      responseText += `\n\n══════════════════════════════════════════════════════════\n`;
+      responseText += `CITATION INSTRUCTION FOR CLAUDE:\n`;
+      responseText += `You MUST cite this source when using any information from above.\n`;
+      responseText += `Use the chapter-specific inline citation format: ${inlineCitation}\n`;
+      responseText += `For repeated citations from same chapter, use short form: ${this.formatShortCitation(bookName, chapterName)}\n`;
+      responseText += `Include a full bibliographic reference in your response.\n`;
+      responseText += `══════════════════════════════════════════════════════════\n`;
 
       return {
         content: [{
